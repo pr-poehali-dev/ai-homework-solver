@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
 
 const subjects = [
   { name: 'Математика', icon: 'Calculator', color: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400' },
@@ -20,6 +22,9 @@ const Index = () => {
   const [question, setQuestion] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
+  const [solution, setSolution] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -39,6 +44,53 @@ const Index = () => {
   }, [isDark]);
 
   const toggleTheme = () => setIsDark(!isDark);
+
+  const handleSolve = async () => {
+    if (!question.trim()) {
+      toast({
+        title: 'Ошибка',
+        description: 'Пожалуйста, введите вопрос или задачу',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setSolution(null);
+
+    try {
+      const response = await fetch('https://functions.poehali.dev/d5bc93f7-41f1-44ce-a885-40e0c7e608c0', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          question: question,
+          subject: selectedSubject
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка при получении решения');
+      }
+
+      setSolution(data.solution);
+      toast({
+        title: 'Готово!',
+        description: 'Решение получено'
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: error instanceof Error ? error.message : 'Не удалось получить решение',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50/30 to-white dark:from-gray-900 dark:via-blue-950/30 dark:to-gray-900 transition-colors duration-500">
@@ -132,16 +184,78 @@ const Index = () => {
               </div>
 
               <Button 
-                size="lg" 
-                className="w-full text-lg py-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 dark:from-blue-500 dark:to-cyan-500 dark:hover:from-blue-600 dark:hover:to-cyan-600 shadow-lg hover:shadow-blue-500/50 hover:scale-[1.02] transition-all duration-300 animate-fade-in"
+                size="lg"
+                onClick={handleSolve}
+                disabled={isLoading}
+                className="w-full text-lg py-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 dark:from-blue-500 dark:to-cyan-500 dark:hover:from-blue-600 dark:hover:to-cyan-600 shadow-lg hover:shadow-blue-500/50 hover:scale-[1.02] transition-all duration-300 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ animationDelay: '800ms' }}
               >
-                <Icon name="Sparkles" size={20} className="mr-2" />
-                Получить решение
+                {isLoading ? (
+                  <>
+                    <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                    Думаю...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="Sparkles" size={20} className="mr-2" />
+                    Получить решение
+                  </>
+                )}
               </Button>
             </div>
           </Card>
         </div>
+
+        {solution && (
+          <div className="max-w-4xl mx-auto mb-16 animate-scale-in">
+            <Card className="p-8 shadow-2xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-semibold flex items-center gap-2 dark:text-white">
+                  <Icon name="CheckCircle2" size={28} className="text-green-600 dark:text-green-400" />
+                  Решение
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSolution(null)}
+                  className="hover:bg-red-100 dark:hover:bg-red-900/20"
+                >
+                  <Icon name="X" size={18} />
+                </Button>
+              </div>
+              <div className="prose prose-blue dark:prose-invert max-w-none">
+                <ReactMarkdown className="text-gray-700 dark:text-gray-200 leading-relaxed">
+                  {solution}
+                </ReactMarkdown>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSolution(null);
+                    setQuestion('');
+                    setSelectedSubject(null);
+                  }}
+                  className="flex-1"
+                >
+                  <Icon name="RefreshCw" size={18} className="mr-2" />
+                  Новый вопрос
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(solution);
+                    toast({ title: 'Скопировано!', description: 'Решение скопировано в буфер обмена' });
+                  }}
+                  className="flex-1"
+                >
+                  <Icon name="Copy" size={18} className="mr-2" />
+                  Копировать
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
 
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-8 dark:text-white animate-fade-in">Все предметы</h2>

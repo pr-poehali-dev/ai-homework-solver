@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request для CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedHeaders": {
+        "Access-Control-Allow-Origin": "*"
+      }
+    },
+    {
+      "name": "POST запрос с вопросом",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "question": "Реши уравнение 2x + 5 = 13",
+        "subject": "Математика"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "solution": "string",
+        "subject": "Математика"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST без вопроса возвращает ошибку",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "question": ""
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
