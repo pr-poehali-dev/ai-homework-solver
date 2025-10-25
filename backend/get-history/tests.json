@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request для CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedHeaders": {
+        "Access-Control-Allow-Origin": "*"
+      }
+    },
+    {
+      "name": "GET история задач",
+      "method": "GET",
+      "path": "/?user_session=test_user&limit=5",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "tasks": "array",
+        "count": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

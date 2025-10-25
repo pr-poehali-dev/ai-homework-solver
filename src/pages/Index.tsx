@@ -18,15 +18,34 @@ const subjects = [
   { name: 'Английский', icon: 'Languages', color: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' },
 ];
 
+interface HistoryTask {
+  id: number;
+  question: string;
+  subject: string | null;
+  solution: string;
+  created_at: string;
+}
+
 const Index = () => {
   const [question, setQuestion] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
   const [solution, setSolution] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [history, setHistory] = useState<HistoryTask[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [userSession, setUserSession] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
+    let session = localStorage.getItem('user_session');
+    if (!session) {
+      session = 'user_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('user_session', session);
+    }
+    setUserSession(session);
+    loadHistory(session);
+    
     const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
     setIsDark(darkModeQuery.matches);
     
@@ -44,6 +63,18 @@ const Index = () => {
   }, [isDark]);
 
   const toggleTheme = () => setIsDark(!isDark);
+
+  const loadHistory = async (session: string) => {
+    try {
+      const response = await fetch(`https://functions.poehali.dev/6afd1d6e-6063-4f41-bf45-f54dd82c4d17?user_session=${session}&limit=20`);
+      const data = await response.json();
+      if (response.ok) {
+        setHistory(data.tasks || []);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки истории:', error);
+    }
+  };
 
   const handleSolve = async () => {
     if (!question.trim()) {
@@ -66,7 +97,8 @@ const Index = () => {
         },
         body: JSON.stringify({
           question: question,
-          subject: selectedSubject
+          subject: selectedSubject,
+          user_session: userSession
         })
       });
 
@@ -77,6 +109,7 @@ const Index = () => {
       }
 
       setSolution(data.solution);
+      loadHistory(userSession);
       toast({
         title: 'Готово!',
         description: 'Решение получено'
@@ -100,14 +133,24 @@ const Index = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8 relative z-10">
-        <Button
-          onClick={toggleTheme}
-          variant="outline"
-          size="icon"
-          className="fixed top-6 right-6 z-50 rounded-full shadow-lg hover:scale-110 transition-transform duration-300"
-        >
-          <Icon name={isDark ? 'Sun' : 'Moon'} size={20} />
-        </Button>
+        <div className="fixed top-6 right-6 z-50 flex gap-2">
+          <Button
+            onClick={() => setShowHistory(!showHistory)}
+            variant="outline"
+            size="icon"
+            className="rounded-full shadow-lg hover:scale-110 transition-transform duration-300"
+          >
+            <Icon name="History" size={20} />
+          </Button>
+          <Button
+            onClick={toggleTheme}
+            variant="outline"
+            size="icon"
+            className="rounded-full shadow-lg hover:scale-110 transition-transform duration-300"
+          >
+            <Icon name={isDark ? 'Sun' : 'Moon'} size={20} />
+          </Button>
+        </div>
 
         <header className="text-center mb-16 animate-fade-in-up">
           <div className="inline-block mb-6 animate-glow">
@@ -253,6 +296,73 @@ const Index = () => {
                   Копировать
                 </Button>
               </div>
+            </Card>
+          </div>
+        )}
+
+        {showHistory && (
+          <div className="max-w-4xl mx-auto mb-16 animate-scale-in">
+            <Card className="p-8 shadow-2xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-2xl font-semibold flex items-center gap-2 dark:text-white">
+                  <Icon name="History" size={28} className="text-blue-600 dark:text-blue-400" />
+                  История решений
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHistory(false)}
+                  className="hover:bg-red-100 dark:hover:bg-red-900/20"
+                >
+                  <Icon name="X" size={18} />
+                </Button>
+              </div>
+              {history.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                  <Icon name="FileQuestion" size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>История пока пуста. Решите первую задачу!</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                  {history.map((task) => (
+                    <Card
+                      key={task.id}
+                      className="p-4 hover:shadow-lg transition-all cursor-pointer border dark:border-gray-700"
+                      onClick={() => {
+                        setQuestion(task.question);
+                        setSelectedSubject(task.subject);
+                        setSolution(task.solution);
+                        setShowHistory(false);
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                          <Icon name="MessageSquare" size={20} className="text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {task.subject && (
+                            <Badge variant="secondary" className="mb-2">
+                              {task.subject}
+                            </Badge>
+                          )}
+                          <p className="text-sm font-medium dark:text-white line-clamp-2">
+                            {task.question}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {new Date(task.created_at).toLocaleDateString('ru-RU', {
+                              day: 'numeric',
+                              month: 'long',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <Icon name="ChevronRight" size={18} className="text-gray-400 flex-shrink-0" />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
         )}
